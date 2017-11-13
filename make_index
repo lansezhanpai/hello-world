@@ -1,0 +1,126 @@
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <algorithm>
+#include <dirent.h>
+#include <vector>
+#include <fcntl.h>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <queue>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+using namespace std;
+
+struct T {
+  string word;
+  int fileNum;
+  int count;
+};
+vector<T> sum,abc;
+vector<string> BOX;         //单词种类
+vector<string> all_file;    //文件种类
+map<string, int> fileStore; //储存文件编号
+map<string, int> wordStore; //确定单词是否被读以及赋予编号
+map<int, int> sum_in_file;  //文件中某个单词总数
+int sum_word, sum_file; //目录单词总数，目录文件总数
+
+//历遍文件
+void scan_file(const char *fileName) {
+  sum_file++;
+sum_in_file.clear();
+wordStore.clear();
+BOX.clear();
+  sum_word = 0;
+  string Z(fileName);
+  fileStore[Z] = sum_file;//Z是第sum_file个文件
+  all_file.push_back(Z);//将Z添加到all_file中
+  ifstream infile;
+  infile.open(fileName);
+  string aim;
+  while (infile >> aim) {
+    if (!wordStore[aim]) {//存在为1，不存在为0
+      wordStore[aim]= ++sum_word;//不存在时添加，第sum_word个词
+      BOX.push_back(aim);//将这个词添加进去
+    }
+    sum_in_file[wordStore[aim]]++;//已有则+1
+  }
+  for (int i = 0; i < sum_word; i++){
+    
+    sum.push_back(T{BOX[i], sum_file, sum_in_file[wordStore[BOX[i]]]});
+}
+  infile.close();
+}
+
+//历遍目录
+void scan_dir(const char *path) {
+  struct dirent *ent = NULL;
+  DIR *pDir;
+  pDir = opendir(path);
+  if (pDir == NULL)
+    return;
+  while (NULL != (ent = readdir(pDir))) {
+    string _path(path);
+    string _dirName(ent->d_name);
+    string _fullPath = _path + "/" + _dirName;
+    if (ent->d_type == 8) {
+      scan_file(_fullPath.c_str());
+    } else {
+      if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+        continue;
+      scan_dir(_fullPath.c_str());
+    }
+  }
+}
+
+bool compare(T a, T b) {
+  if (a.word == b.word)
+    return a.count <vim b.count;
+  return a.word < b.word;
+}
+
+
+
+void Store() {
+  ofstream outfile;
+  outfile.open("index.dat");
+  wordStore.clear();
+  sum_in_file.clear();
+  sum_word = 0;
+  outfile << sum_file << endl;
+  for (int i = 0; i < all_file.size(); i++)
+    outfile << all_file[i] << endl;
+ sort(sum.begin(), sum.end(), compare);
+  for (int i = 0; i < sum.size(); i++) {
+    if (!wordStore[sum[i].word]) {
+      sum_word++;
+      wordStore[sum[i].word] = 1;
+    }
+    sum_in_file[sum_word]++;//编号为sum_word的词有多少+1个
+  }
+  outfile << sum_word << endl;
+  for (int i = 1; i <= sum_word; i++)
+    outfile << sum_in_file[i] << endl;
+  wordStore.clear();
+  for (int i = 0; i < sum.size(); i++) {
+    if (!wordStore[sum[i].word]) {
+      outfile << endl;
+      wordStore[sum[i].word] = 1;
+      outfile << sum[i].word << endl;
+    }
+    outfile << sum[i].fileNum << endl <<sum[i].count << endl;
+  }
+  outfile.close();
+}
+
+int main() {
+  string path;
+  cout << "Please input path:" << endl;
+  cin >> path;
+  scan_dir(path.c_str());
+  cout << "Done." << " " << "Used" << " " << (double)clock() / CLOCKS_PER_SEC << "s" << endl;
+  cout << "Data saved to ./index.dat." << endl;
+  Store();
+}
